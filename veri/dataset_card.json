@@ -1,0 +1,54 @@
+{
+  "track": "T01",
+  "version": "2.0",
+  "task": "multiclass",
+  "classes": [
+    "normal",
+    "pneumonia_like_opacity"
+  ],
+  "primary_metric": "macro_f1",
+  "counts": {
+    "train": 11624,
+    "val": 2771,
+    "test": 2501
+  },
+  "class_counts": {
+    "train": {
+      "1": 4799,
+      "0": 6825
+    },
+    "val": {
+      "1": 1287,
+      "0": 1484
+    },
+    "test": {
+      "1": 1020,
+      "0": 1481
+    }
+  },
+  "seed": 20261023,
+  "source": "RSNA-STR 2018 / NIH ChestX-ray",
+  "source_url": "https://www.rsna.org/artificial-intelligence/ai-image-challenge/RSNA-Pneumonia-Detection-Challenge-2018",
+  "license": "RSNA Pneumonia Detection Challenge Terms of Use and Attribution; not CC BY",
+  "grouping": "NIH public pseudonymous patient identifier via official mapping; each patient in exactly one split",
+  "image_size": [
+    256,
+    256
+  ],
+  "pixel_preprocessing": "DICOM uint8 pixels; MONOCHROME1 invert if needed; LANCZOS resize to 256x256; no DICOM tags retained",
+  "label_policy": "Calculated final categories L_o8w=0 and L_v8n=1; L_yd0 abnormal without opacity excluded; individual reader annotations not substituted",
+  "clinical_limit": "Pneumonia-like opacity is not a confirmed diagnosis of pneumonia. Source is predominantly adult and not an exclusively pediatric cohort.",
+  "test_release": "Test images without labels are included in the participant package; labels retained organizer-only. Organizer re-runs submitted models on the test set to verify predictions.",
+  "public_source_labels_recoverable": true,
+  "independent_external_test": false,
+  "split_note": "New patient-disjoint holdout within RSNA; independent source from earlier PneumoniaMNIST, not external to new RSNA training data.",
+  "original_candidate_count": 16896,
+  "excluded_duplicate_or_conflict_count": 0,
+  "excluded_ambiguous_class_count": 12788,
+  "test_selection": "Fixed split before baseline evaluation; no score-targeted sample/seed selection",
+  "limits": [
+    "Public source images and labels remain searchable. Offline execution cannot prevent all precomputed answer lookup.",
+    "Exact decoded-pixel and resized-pixel duplicates removed. Near-duplicate or clinical label audit not performed.",
+    "No clinical validation."
+  ]
+}

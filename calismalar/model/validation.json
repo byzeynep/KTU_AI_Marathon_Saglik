@@ -1,0 +1,9 @@
+{
+  "track": "T01",
+  "split": "val",
+  "macro_f1": 0.6689722597675736,
+  "train_count": 11624,
+  "val_count": 2771,
+  "seed": 20261023,
+  "note": "Classical CPU baseline; not a deep learning result or clinical model."
+}
