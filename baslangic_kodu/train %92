@@ -1,0 +1,113 @@
+import torch
+import pathlib
+import pandas as pd
+from torch.utils.data import Dataset, DataLoader
+from PIL import Image
+import torchvision.transforms as transforms
+import torchvision.models as models
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.metrics import f1_score
+from common import read_rows # Eski koddan sadece CSV okuyucuyu alıyoruz
+
+class PnomoniDataset(Dataset):
+    def __init__(self, csv_data, data_dir, transform=None):
+        self.data = csv_data
+        self.data_dir = pathlib.Path(data_dir)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        row = self.data[idx]
+        img_path = self.data_dir / row['path']
+        # ResNet RGB format beklediği için L (Grayscale) yerine RGB'ye çeviriyoruz
+        image = Image.open(img_path).convert('RGB') 
+        label = int(row['label']) # Sağlıklı(0) veya Pnömoni(1)
+        
+        if self.transform:
+            image = self.transform(image)
+            
+        return image, label
+
+# Veri artırımı ve normalizasyon (ResNet'in beklediği standart değerler)
+transform_train = transforms.Compose([
+    transforms.RandomRotation(10), # Ezberlemeyi önlemek için hafif döndürme
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+transform_val = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+def main():
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument('--data', required=True)
+    p.add_argument('--output', required=True)
+    a = p.parse_args()
+    
+    data_dir = pathlib.Path(a.data)
+    out_dir = pathlib.Path(a.output)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # CSV dosyalarını common.py'deki fonksiyonla okuyoruz
+    train_csv = read_rows(data_dir / 'train.csv')
+    val_csv = read_rows(data_dir / 'val.csv')
+    
+    print("Veri setleri hazırlanıyor...")
+    train_dataset = PnomoniDataset(train_csv, data_dir, transform=transform_train)
+    val_dataset = PnomoniDataset(val_csv, data_dir, transform=transform_val)
+    
+    # Dataloader: Görüntüleri 32'şerli paketler (batch) halinde modele besler
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    
+    print("Model yükleniyor (ResNet18)...")
+    # Önceden ImageNet'te eğitilmiş ağırlıkları indiriyoruz
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    
+    # ResNet18'in son katmanını bizim 2 sınıfımıza (0: Normal, 1: Pnömoni) göre değiştiriyoruz
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, 2)
+    
+    # Ekran kartı (GPU) varsa onu, yoksa işlemciyi (CPU) kullan
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    print(f"Eğitim {device} üzerinde başlıyor...")
+    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    
+    # Hızlı sonuç almak için şimdilik 3 epoch (döngü) eğitiyoruz
+    epochs = 3
+    for epoch in range(epochs):
+        model.train()
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            
+        # Her epoch sonunda Doğrulama (Validation) skorumuzu ölçüyoruz
+        model.eval()
+        all_preds, all_labels = [], []
+        with torch.no_grad():
+            for images, labels in val_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                _, preds = torch.max(outputs, 1)
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        
+        val_f1 = f1_score(all_labels, all_preds, average='macro')
+        print(f"Epoch {epoch+1}/{epochs} tamamlandı - Validation Macro F1: {val_f1:.4f}")
+
+if __name__ == '__main__':
+    main()
